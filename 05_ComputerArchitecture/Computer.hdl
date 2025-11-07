@@ -1,0 +1,28 @@
+CHIP Computer {
+
+    IN reset;
+
+    PARTS:
+// 命令メモリ（ROM32K）：PCをアドレスに命令を取り出す
+    ROM32K(address=pc, out=instruction);
+
+    // CPU：命令を実行し、メモリアクセス信号を出す
+    CPU(
+        inM=memOut,               // M=Memory[addressM] の値
+        instruction=instruction,  // 取り出した命令
+        reset=reset,              // リセット入力
+
+        outM=cpuOutM,             // メモリへ書き込むデータ
+        writeM=cpuWriteM,         // メモリ書き込みイネーブル
+        addressM=cpuAddressM,     // メモリアドレス（Aの下位15bit）
+        pc=pc                     // 次命令アドレス（ROM32Kへのアドレス）
+    );
+
+    // データメモリ（RAM16K + Screen + Keyboard を内包）
+    Memory(
+        in=cpuOutM,               // 書き込みデータ
+        load=cpuWriteM,           // 書き込みイネーブル
+        address=cpuAddressM,      // アドレス（15bit）
+        out=memOut                // 読み出しデータ（M）
+    );
+}

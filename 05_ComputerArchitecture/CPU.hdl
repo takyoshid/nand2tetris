@@ -1,0 +1,64 @@
+CHIP CPU {
+
+    IN  inM[16],         // M value input  (M = contents of RAM[A])
+        instruction[16], // Instruction for execution
+        reset;           // Signals whether to re-start the current
+                         // program (reset==1) or continue executing
+                         // the current program (reset==0).
+
+    OUT outM[16],        // M value output
+        writeM,          // Write to M? 
+        addressM[15],    // Address in data memory (of M)
+        pc[15];          // address of next instruction
+
+    PARTS:
+	//Aregister and addressM
+    Mux16(a=instruction, b=aluOut, sel=instruction[15], out=forward1);
+    Not(in=instruction[15], out=aInstructionFlag);
+    And(a=instruction[15], b=instruction[5], out=cInstructionAndAInDest);
+    Or(a=aInstructionFlag, b=cInstructionAndAInDest, out=aRegisterLoad);
+    ARegister(
+        in=forward1, load=aRegisterLoad,
+        out=aRegisterOut, out[0..14]=addressM
+    );
+
+    // Dレジスタ
+    And(a=instruction[15], b=instruction[4], out=dRegisterLoad);
+    DRegister(in=aluOut, load=dRegisterLoad, out=xToALU);
+
+    // ALU (入力はDとAorM)
+    Mux16(a=aRegisterOut, b=inM, sel=instruction[12], out=yToALU);
+    ALU(
+        x=xToALU, y=yToALU,
+        zx=instruction[11], nx=instruction[10],
+        zy=instruction[9],  ny=instruction[8],
+        f=instruction[7],   no=instruction[6],
+        out=aluOut, zr=zr, ng=ng
+    );
+
+    // outM
+    Mux16(a=aluOut, b=aluOut, sel=false, out=outM);
+
+    // writeM
+    And(a=instruction[15], b=instruction[3], out=writeM);
+
+    // --- PC ---
+    // ジャンプするか否か
+    Not(in=zr, out=notZr);
+    Not(in=ng, out=notNg);
+    And(a=notZr, b=notNg, out=pos);  //positive
+    And(a=instruction[2], b=pos, out=jgt);   // JGT & pos
+    And(a=instruction[1], b=zr,  out=jeq);   // JEQ & zr
+    And(a=instruction[0], b=ng,  out=jlt);   // JLT & ng
+    Or(a=jgt, b=jeq, out=jt1);
+    Or(a=jt1, b=jlt, out=jTrue);             // いずれか真ならジャンプ
+
+    // PC
+    And(a=instruction[15], b=jTrue, out=pcLoadFlag);
+    Not(in=pcLoadFlag, out=pcIncFlag);
+    PC(
+        in=aRegisterOut,
+        load=pcLoadFlag, inc=pcIncFlag, reset=reset,
+        out[0..14]=pc
+    );
+}

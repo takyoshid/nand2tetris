@@ -187,16 +187,32 @@ class CodeWriter:
             "@SP",
             "AM=M-1",   # SP--, A=SP, M=*SP (y)
             "D=M",      # D = y
-            "A=A-1",    # A = SP-1 (x)
+            "A=A-1",    # A = SP-1 (x), M = x
         ]
+
         if op == "add":
-            self.lines.append("M=M+D")   # x = x + y
+            # D = x + y （D+M を使う）
+            self.lines += [
+                "D=D+M",  # D = y + x
+                "M=D",    # M = x + y
+            ]
         elif op == "sub":
-            self.lines.append("M=M-D")   # x = x - y
+            # x - y = x + (-y)
+            self.lines += [
+                "D=-D",   # D = -y
+                "D=D+M",  # D = -y + x = x - y
+                "M=D",
+            ]
         elif op == "and":
-            self.lines.append("M=M&D")   # x = x & y
+            self.lines += [
+                "D=D&M",  # y & x
+                "M=D",
+            ]
         elif op == "or":
-            self.lines.append("M=M|D")   # x = x | y
+            self.lines += [
+                "D=D|M",  # y | x
+                "M=D",
+            ]
 
     def _write_unary_op(self, op: str) -> None:
         """
@@ -222,8 +238,8 @@ class CodeWriter:
           lt: x <  y ? -1 : 0
         スタックトップ2つ (x,y) → 1つ (true:-1, false:0)
         """
-        true_label = f"{op.upper()}_TRUE_{self.label_count}"
-        end_label = f"{op.upper()}_END_{self.label_count}"
+        true_label = f"{op.UPPER()}_TRUE_{self.label_count}"
+        end_label = f"{op.UPPER()}_END_{self.label_count}"
         self.label_count += 1
 
         jump = {
@@ -232,12 +248,14 @@ class CodeWriter:
             "lt": "JLT",
         }[op]
 
+        # x - y を D に入れてから判定する（D+M だけを使う形に統一）
         self.lines += [
             "@SP",
             "AM=M-1",   # SP--, A=SP, M=*SP (y)
             "D=M",      # D = y
-            "A=A-1",    # A = SP-1 (x)
-            "D=M-D",    # D = x - y
+            "A=A-1",    # A = SP-1 (x), M = x
+            "D=-D",     # D = -y
+            "D=D+M",    # D = -y + x = x - y
             f"@{true_label}",
             f"D;{jump}",   # 条件成立 → true_label
             # false の場合
@@ -253,7 +271,7 @@ class CodeWriter:
             "M=-1",        # true = -1
             f"({end_label})",
         ]
-
+        
     # ---------- push / pop ----------
 
     def write_push_pop(self, ctype: CommandType, segment: str, index: int) -> None:

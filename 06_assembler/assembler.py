@@ -40,7 +40,7 @@ JUMP_TABLE: Dict[Optional[str], str] = {
 }
 
 COMP_TABLE: Dict[str, str] = {
-    # a=0
+    # a=0　(Mは使用せず、AとDのみ使用)
     "0":   "0101010",
     "1":   "0111111",
     "-1":  "0111010",
@@ -117,14 +117,17 @@ def parse_c_instruction(line: str) -> Tuple[Optional[str], str, Optional[str]]:
     Returns (dest, comp, jump)
     line could be: dest=comp;jump | comp;jump | dest=comp | comp
     """
+    # 1.destの設定（destの初期値をNoneにしてから、=があればdestを設定）
     dest, compjump = None, line
     if "=" in line:
         dest, compjump = line.split("=", 1)
-        dest = dest.strip() or None
+        dest = dest.strip() or None # destが空の場合はNoneにする
+    # 2.jumpの設定（jumpの初期値をNoneにしてから、;があればjumpを設定）
     comp, jump = compjump, None
     if ";" in compjump:
         comp, jump = compjump.split(";", 1)
-        jump = jump.strip() or None
+        jump = jump.strip() or None #jumpが空の場合はNoneにする
+    # 3.compの設定(lineに=も;もない場合はlineそのものがcompになる)
     comp = comp.strip()
     return dest, comp, jump
 
@@ -168,7 +171,7 @@ def pass2_translate(lines: List[SourceLine], symbols: Dict[str, int]) -> List[st
     for s in lines:
         text = strip_comment_and_ws(s.raw)
         if not text or is_label(text):
-            continue
+            continue # 次の行(text)に進む
 
         if is_a_instruction(text):
             token = parse_a_symbol(text)
@@ -184,7 +187,7 @@ def pass2_translate(lines: List[SourceLine], symbols: Dict[str, int]) -> List[st
                 else:
                     addr = symbols[token]
             out.append("0" + to_15bit_binary(addr))
-            continue
+            continue # 次の行(text)に進む
 
         # C-instruction
         dest, comp, jump = parse_c_instruction(text)
